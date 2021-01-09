@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quran</title>
+    <style>
+      body {
+        font-size: large;
+        padding-right: 50px;
+        padding-left: 50px;
+      }
+
+      .header {
+        text-align: center;
+        font-size: xx-large;
+      }
+
+      .title {
+        font-size: x-large;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="header">بسم الله الرحمن الرحيم</p>
+
+    <div id="loadingDiv">
+      <p>جارى التحميل...</p>
+    </div>
+
+    <!-- Choose surah -->
+    <div>
+      <span class="title">السورة</span>
+      <select id="surahsSelect" style="font-size: large"></select>
+    </div>
+    <br />
+
+    <!-- Choose ayahs-->
+    <div>
+      <span class="title">الايات</span>
+      <span>من</span>
+      <input type="number" value="1" id="fromAyahInput" />
+      <span>الى</span>
+      <input type="number" value="7" id="toAyahInput" />
+    </div>
+    <br />
+
+    <!-- Repetition times-->
+    <div>
+      <span class="title">التكرار</span>
+      <input type="number" value="7" id="repeatInput" />
+    </div>
+    <hr />
+    <br />
+
+    <!-- Controls -->
+    <div>
+      <button onclick="run()">تشغيل</button>
+      <small>رقم التكرار</small>
+      <small style="color: red">الرقم</small>
+    </div>
+    <br />
+
+    <div>
+      <audio id="ayahAudio" controls onended="onAudioEnded()"></audio>
+    </div>
+
+    <!-- Recitation -->
+    <div>
+      <p id="ayahsText">
+        قل هو الله احمد الله الصمد لم يلد ولم يولد ولم يكن له كفوا احد
+      </p>
+    </div>
+
+    <script>
+      // TODO set globals properly
+      let ayahs;
+      let ayahNumber;
+      let repeatTimes;
+      let repeatNumber;
+
+      function onAudioEnded() {
+        if (ayahNumber > ayahs.length - 1) {
+          // We just listened to all ayahs
+          if (repeatNumber < repeatTimes) {
+            // One more time, please
+            repeatNumber++;
+            playAyah(ayahs[0]);
+            ayahNumber = 1;
+          }
+        } else {
+          playAyah(ayahs[ayahNumber]);
+          ayahNumber++;
+        }
+      }
+
+      function handleError(e) {
+        ayahs = undefined;
+        repeatTimes = undefined;
+        repeatNumber = undefined;
+        ayahNumber = undefined;
+        // TODO show error in dom
+        console.error(e);
+        throw new Error(e);
+      }
+
+      function playAyah(ayah) {
+        console.log(ayah);
+        const ayahAudio = document.getElementById("ayahAudio");
+        ayahAudio.innerHTML = "";
+        for (let audioSource of ayah.audioSources) {
+          const source = document.createElement("source");
+          source.src = audioSource;
+          ayahAudio.appendChild(source);
+        }
+        ayahAudio.load();
+        ayahAudio.play();
+      }
+
+      function run() {
+        const surahNumber = document.getElementById("surahsSelect").value;
+        const fromAyah = document.getElementById("fromAyahInput").value;
+        const toAyah = document.getElementById("toAyahInput").value;
+
+        (async () => {
+          let ayahsList = [];
+
+          // Fetch ayahs and add them to ayahs list
+          for (let i = fromAyah; i < toAyah; i++) {
+            const ayahRes = await fetch(
+              `http://api.alquran.cloud/v1/ayah/${surahNumber}:${i}/ar.alafasy`
+            );
+            if (!ayahRes.ok) {
+              handleError(new Error(ayahRes.statusText));
+            }
+            const ayah = (await ayahRes.json()).data;
+
+            ayahsList.push({
+              audioSources: [ayah.audio, ...ayah.audioSecondary],
+              text: ayah.text,
+            });
+          }
+
+          return ayahsList;
+        })()
+          .then((ayahsList) => {
+            if (ayahsList.length === 0) {
+              throw new Error("There are no ayahs fetched");
+            }
+
+            // Set globals
+            ayahs = ayahsList;
+            repeatTimes = parseInt(
+              document.getElementById("repeatInput").value
+            );
+            repeatNumber = 1; // TODO handle repeat number in dom
+            ayahNumber = 1;
+
+            // Recitation
+            document.getElementById("ayahsText").innerHTML = ayahs
+              .map((ayah) => ayah.text)
+              .join("<br/>");
+
+            // Audio (Run first ayah)
+            playAyah(ayahs[0]);
+          })
+          .catch((e) => {
+            handleError(e);
+          });
+      }
+
+      window.onload = function () {
+        (async () => {
+          // Load surahs into the select element
+          const surahsRes = await fetch("http://api.alquran.cloud/v1/surah");
+          const surahs = (await surahsRes.json()).data;
+          const surahsSelect = document.getElementById("surahsSelect");
+          for (surah of surahs) {
+            const opt = document.createElement("option");
+            opt.value = surah.number;
+            opt.innerHTML =
+              surah.number +
+              "." +
+              surah.name +
+              " - " +
+              surah.numberOfAyahs +
+              " ايه" +
+              " - " +
+              surah.revelationType;
+            surahsSelect.appendChild(opt);
+          }
+        })()
+          .then(() => {
+            document.getElementById("loadingDiv").remove();
+          })
+          .catch((e) => {
+            console.error(e);
+            document.write("error, reload the page");
+          });
+      };
+    </script>
+  </body>
+</html>
