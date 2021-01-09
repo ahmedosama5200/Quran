@@ -24,6 +24,10 @@
   <body>
     <p class="header">بسم الله الرحمن الرحيم</p>
 
+    <div id="errorDiv" style="display: none; color: red">
+      <p>Something went wrong. reload page</p>
+    </div>
+
     <div id="loadingDiv">
       <p>جارى التحميل...</p>
     </div>
@@ -57,7 +61,7 @@
     <div>
       <button onclick="run()">تشغيل</button>
       <small>رقم التكرار</small>
-      <small style="color: red">الرقم</small>
+      <small style="color: steelblue" id="repeatView">الرقم</small>
     </div>
     <br />
 
@@ -73,18 +77,22 @@
     </div>
 
     <script>
-      // TODO set globals properly
       let ayahs;
       let ayahNumber;
       let repeatTimes;
       let repeatNumber;
+
+      function setRepeatNumber(n) {
+        repeatNumber = n;
+        document.getElementById("repeatView").innerHTML = n;
+      }
 
       function onAudioEnded() {
         if (ayahNumber > ayahs.length - 1) {
           // We just listened to all ayahs
           if (repeatNumber < repeatTimes) {
             // One more time, please
-            repeatNumber++;
+            setRepeatNumber(repeatNumber + 1);
             playAyah(ayahs[0]);
             ayahNumber = 1;
           }
@@ -96,10 +104,13 @@
 
       function handleError(e) {
         ayahs = undefined;
-        repeatTimes = undefined;
-        repeatNumber = undefined;
         ayahNumber = undefined;
-        // TODO show error in dom
+        repeatTimes = undefined;
+        setRepeatNumber(undefined);
+
+        // show error in dom
+        document.getElementById("errorDiv").style.display = "block";
+
         console.error(e);
         throw new Error(e);
       }
@@ -153,7 +164,7 @@
             repeatTimes = parseInt(
               document.getElementById("repeatInput").value
             );
-            repeatNumber = 1; // TODO handle repeat number in dom
+            setRepeatNumber(1);
             ayahNumber = 1;
 
             // Recitation
